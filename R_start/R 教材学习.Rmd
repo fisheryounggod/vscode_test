@@ -1,0 +1,399 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
+
+```{r}
+# 一键更新包
+pkgs <- c(
+  "assertthat", 
+  "backports", "base64enc", "BH", "bindr", "bindrcpp", "bookdown", "broom", 
+  "callr", "cellranger", "cli", "clipr", "clorspace", "crayon", "curl", 
+  "DBI", "dbplyr", "dichromat", "digest", "dplyr", 
+  "evaluate", 
+  "forcats", 
+  "ggplot2", "glue", "gtable", 
+  "haven", "highr", "hms", "htmltools", "httr", 
+  "jsonlite", 
+  "knitr", 
+  "labeling", "lazyeval", "lubridate", 
+  "magrittr", "markdown", "microbenchmark", "mime", "mnormt", "modelr", "munsell", 
+  "openssl", 
+  "pillar", "pkgconfig", "plogr", "plyr", "psych", "purr", 
+  "R6", "RColorBrewer", "Rcpp", "readr", "readxl", 
+  "rematch", "reprex", "reshape2", "rlang", "rmarkdown", 
+  "rprojroot", "rstudioapi", "rvest", 
+  "scales", "selectr", "stringi", "stringr", 
+  "tibble", "tidyr", "tidyselect", "tidyverse", 
+  "utf8", 
+  "viridisLite", 
+  "whisker", 
+  "xml2", "xtable",
+  "yaml"
+)
+install.packages(unique(pkgs))
+```
+
+```{r}
+#迁移扩展包
+options(repos=c(CRAN="http://mirror.tuna.tsinghua.edu.cn/CRAN/"))
+update.packages(checkBuilt=TRUE, ask=FALSE)
+
+```
+
+```{r}
+library(tidyverse) # Wickham 的数据整理的整套工具
+library(lubridate) # 日期和日期时间数据处理
+library(quantmod) # 金融数据的整理与作图功能
+```
+
+```{r}
+# lubridate 是一个提供了许多日期和日期时间功能的扩展包
+
+lubridate::ymd("2018-07-02")
+```
+
+```{r}
+year<-2020
+mon<-05
+day<-25
+lubridate::make_date(year, mon, day)
+```
+
+```{r}
+getwd()
+```
+
+
+```{r}
+setwd('/Users/mac/我的项目/RLanguage/ftsdata')
+x <- scan("bp500-2691.txt")
+```
+
+```{r}
+kings <- scan("http://robjhyndman.com/tsdldata/misc/kings.dat",skip=3)
+kings
+```
+
+```{r}
+kingstimeseries <- ts(kings)
+```
+
+```{r}
+kingstimeseries
+```
+
+```{r}
+births <- scan("http://robjhyndman.com/tsdldata/data/nybirths.dat")
+birthstimeseries <- ts(births, frequency=12, start=c(1946,1))
+birthstimeseries
+```
+
+```{r}
+souvenir <- scan("http://robjhyndman.com/tsdldata/data/fancy.dat")
+souvenirtimeseries <- ts(souvenir, frequency=12, start=c(1987,1))
+souvenirtimeseries
+```
+
+```{r}
+plot.ts(kingstimeseries)
+```
+
+```{r}
+plot.ts(birthstimeseries)
+
+```
+
+```{r}
+plot.ts(souvenirtimeseries)
+```
+
+```{r}
+logsouvenirtimeseries <- log(souvenirtimeseries) 
+plot.ts(logsouvenirtimeseries)
+```
+
+```{r}
+library("TTR")
+
+```
+
+```{r}
+kingstimeseriesSMA3 <- SMA(kingstimeseries,n=3)
+
+```
+
+```{r}
+plot.ts(kingstimeseriesSMA3)
+```
+
+```{r}
+kingstimeseriesSMA8 <- SMA(kingstimeseries,n=8) 
+plot.ts(kingstimeseriesSMA8)
+```
+
+```{r}
+birthstimeseriescomponents <- decompose(birthstimeseries)
+```
+
+```{r}
+birthstimeseriescomponents$seasonal # get the estimated values of the seasonal
+
+```
+
+```{r}
+plot(birthstimeseriescomponents)
+```
+
+```{r}
+birthstimeseriescomponents <- decompose(birthstimeseries) 
+birthstimeseriesseasonallyadjusted <- birthstimeseries-birthstimeseriescomponents$seasonal
+```
+
+```{r}
+plot(birthstimeseriesseasonallyadjusted)
+```
+
+```{r}
+rain <- scan("http://robjhyndman.com/tsdldata/hurst/precip1.dat",skip=1) 
+rainseries <- ts(rain,start=c(1813)) 
+plot.ts(rainseries)
+```
+
+```{r}
+rainseriesforecasts <- HoltWinters(rainseries, beta=FALSE, gamma=FALSE) 
+rainseriesforecasts
+```
+
+```{r}
+rainseriesforecasts$fitted
+```
+
+```{r}
+plot(rainseriesforecasts)
+
+```
+
+```{r}
+rainseriesforecasts$SSE
+```
+
+```{r}
+HoltWinters(rainseries, beta=FALSE, gamma=FALSE, l.start=23.56)
+```
+
+```{r}
+library('forecast')
+```
+
+```{r}
+rainseriesforecasts2 <- forecast(rainseriesforecasts,h=8) 
+rainseriesforecasts2
+```
+
+```{r}
+plot(rainseriesforecasts2)
+```
+
+```{r}
+acf(na.omit(rainseriesforecasts2$residuals), lag.max=20)
+```
+
+```{r}
+Box.test(rainseriesforecasts2$residuals, lag=20, type="Ljung-Box")
+```
+
+```{r}
+plot.ts(rainseriesforecasts2$residuals)
+```
+
+```{r}
+plotForecastErrors <- function(forecasterrors) 
+{ 
+    # make a histogram of the forecast errors: 
+    mybinsize <- IQR(forecasterrors)/4 
+    mysd <- sd(forecasterrors) 
+    mymin <- min(forecasterrors) - mysd*5
+    mymax <- max(forecasterrors) + mysd*3 
+    # generate normally distributed data with mean 0 and standard deviation mysd 
+    mynorm <- rnorm(10000, mean=0, sd=mysd) 
+    mymin2 <- min(mynorm) 
+    mymax2 <- max(mynorm) 
+    if (mymin2 < mymin)  { mymin <- mymin2 }
+    if (mymax2 > mymax) { mymax <- mymax2 } 
+    # make a red histogram of the forecast errors, with the normally distributed ˓ →data overlaid: 
+    mybins <- seq(mymin, mymax, mybinsize) 
+    hist(forecasterrors, col="red", freq=FALSE, breaks=mybins) 
+    # freq=FALSE ensures the area under the histogram = 1 
+    # generate normally distributed data with mean 0 and standard deviation mysd 
+    myhist <- hist(mynorm, plot=FALSE, breaks=mybins) 
+    # plot the normal curve as a blue line on top of the histogram of forecast ˓ →errors: 
+    points(myhist$mids, myhist$density, type="l", col="blue", lwd=2) 
+}
+```
+
+```{r}
+plotForecastErrors(na.omit(rainseriesforecasts2$residuals))
+```
+
+```{r}
+logsouvenirtimeseries <- log(souvenirtimeseries) 
+souvenirtimeseriesforecasts <- HoltWinters(logsouvenirtimeseries) 
+souvenirtimeseriesforecasts
+```
+
+```{r}
+plot(souvenirtimeseriesforecasts)
+```
+
+```{r}
+
+```
+
+```{r}
+skirts <- scan("http://robjhyndman.com/tsdldata/roberts/skirts.dat",skip=5) 
+skirtsseries <- ts(skirts,start=c(1866))
+plot.ts(skirtsseries)
+```
+
+```{r}
+skirtsseriesforecasts <- HoltWinters(skirtsseries, gamma=FALSE)
+skirtsseriesforecasts 
+
+```
+
+```{r}
+skirtsseriesforecasts$SSE
+```
+
+```{r}
+plot(skirtsseriesforecasts)
+```
+
+```{r}
+HoltWinters(skirtsseries, gamma=FALSE, l.start=608, b.start=9)
+```
+
+```{r}
+skirtsseriesforecasts2 <- forecast(skirtsseriesforecasts, h=19) 
+plot(skirtsseriesforecasts2)
+```
+
+```{r}
+acf(na.omit(skirtsseriesforecasts2$residuals), lag.max=20)
+Box.test(skirtsseriesforecasts2$residuals, lag=20, type="Ljung-Box")
+```
+
+```{r}
+plot.ts(skirtsseriesforecasts2$residuals) # make a time plot 
+```
+
+```{r}
+plotForecastErrors(na.omit(skirtsseriesforecasts2$residuals)) # make a histogram
+```
+
+```{r}
+souvenirtimeseriesforecasts2 <- forecast(souvenirtimeseriesforecasts,h=48) 
+plot(souvenirtimeseriesforecasts2)
+```
+
+```{r}
+acf(na.omit(souvenirtimeseriesforecasts2$residuals, lag.max=20))
+
+```
+
+```{r}
+Box.test(souvenirtimeseriesforecasts2$residuals, lag=20, type="Ljung-Box")
+```
+
+```{r}
+plot.ts(souvenirtimeseriesforecasts2$residuals) # make a time plot 
+
+```
+
+```{r}
+plotForecastErrors(na.omit(souvenirtimeseriesforecasts2$residuals) )# make a histogram
+```
+
+```{r}
+skirtsseriesdiff1 <- diff(skirtsseries, differences=1) 
+plot.ts(skirtsseriesdiff1)
+```
+
+```{r}
+skirtsseriesdiff2 <- diff(skirtsseries, differences=2) 
+plot.ts(skirtsseriesdiff2)
+```
+
+```{r}
+kingtimeseriesdiff1 <- diff(kingstimeseries, differences=1) 
+plot.ts(kingtimeseriesdiff1)
+```
+
+```{r}
+acf(kingtimeseriesdiff1, lag.max=20) # plot a correlogram 
+
+```
+
+```{r}
+acf(kingtimeseriesdiff1, lag.max=20, plot=FALSE) # get the autocorrelation values
+```
+
+```{r}
+pacf(kingtimeseriesdiff1, lag.max=20) # plot a partial correlogram 
+```
+
+```{r}
+pacf(kingtimeseriesdiff1, lag.max=20, plot=FALSE)
+```
+
+```{r}
+volcanodust <- scan("http://robjhyndman.com/tsdldata/annual/dvi.dat", skip=1) 
+volcanodustseries <- ts(volcanodust,start=c(1500)) 
+plot.ts(volcanodustseries)
+```
+
+```{r}
+acf(volcanodustseries, lag.max=20) # plot a correlogram 
+
+```
+
+```{r}
+acf(volcanodustseries, lag.max=20, plot=FALSE) # get the values of the ˓ →autocorrelations
+```
+
+```{r}
+pacf(volcanodustseries, lag.max=20) 
+pacf(volcanodustseries, lag.max=20, plot=FALSE)
+```
+
+```{r}
+kingstimeseriesarima <- arima(kingstimeseries, order=c(0,1,1)) # fit an ARIMA(0,1, ˓ →1) model 
+kingstimeseriesarima
+```
+
+```{r}
+kingstimeseriesforecasts <- forecast::Arima(kingstimeseriesarima) 
+kingstimeseriesforecasts
+```
+
+```{r}
+install.packages("forecast")
+```
+
+```{r}
+library('forecast')
+```
+
+```{r}
+
+```
+
+```{r}
+stata("help regress")
+```
+

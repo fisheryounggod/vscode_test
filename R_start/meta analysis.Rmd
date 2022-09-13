@@ -1,0 +1,160 @@
+---
+title: "Meta"
+author: "YXF"
+date: "7/2/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r}
+joy <- data.frame(author = c("Arvanitis", "Beasley", "Bechelli", "Borison", "Chouinard", "Durost",
+                             "Garry", "Howard", "Marder", "Nishikawa", "Nishikawa", "Reschke", "Selman",
+                             "Serafetinides", "Simpson", "Spencer", "Vichaiya"),
+                  year = c(1997, 1996, 1983, 1992, 1993, 1964, 1962, 1974, 1994, 1982, 1984, 1974, 1976, 1972, 1967, 1992, 1971),
+                  resp.h = c(25, 29, 12, 3, 10, 11, 7, 8, 19, 1, 11, 20, 17, 4, 2, 11, 9),
+                  fail.h = c(25, 18, 17, 9, 11, 8, 18, 9, 45, 9, 23, 9, 1, 10, 14, 1, 20),
+                  drop.h = c(2, 22, 1, 0, 0, 0, 1, 0, 2, 0, 3, 0, 11, 0, 0, 0, 1),
+                  resp.p = c(18, 20, 2, 0, 3, 1, 4, 3, 14, 0, 0, 2, 7, 0, 0, 1, 0),
+                  fail.p = c(33, 14, 28, 12, 19, 14, 21, 10, 50, 10, 13, 9, 4, 13, 7, 11, 29),
+                  drop.p =c(0, 34, 1, 0, 0, 0, 1, 0, 2, 0, 0, 0, 18, 1, 1, 0, 1))
+joy
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+# install.packages("meta")
+# install.packages("metasens")
+
+library(meta)
+library(metasens)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+```{r}
+joy$miss <- ifelse((joy$drop.h + joy$drop.p) == 0,
+                  c("Without missing data"), c("With missing data"))
+joy
+```
+```{r}
+settings.meta(digits = 2) # 显示小数点后两位
+
+m.publ <- metabin(resp.h, resp.h + fail.h, resp.p, resp.p + fail.p, # 最重要的四个输入内容
+                 data = joy,
+                 studlab = paste0(author, " (", year, ")"), # 修饰研究的显示标签：author(year)
+                 method.tau = "PM")    # 选择“Paule and Mandel”，二分类结局的推荐方法
+
+m.publ
+```
+```{r}
+pdf("figure1.pdf", width = 10, height = 6)  # 同时调整图片的宽和高
+
+forest(m.publ,
+       sortvar = year,    # 按时间排序
+       prediction = TRUE, # 在森林图中显示“prediction interval”
+       label.left = "Favours placebo",      # 在森林图底部的左侧加上标签
+       label.right = "Favours haloperidol") # 在森林图底部的右侧加上标签
+
+dev.off() 
+```
+```{r}
+m.publ.sub <- update(m.publ,
+                     byvar = miss,        # 缺失数据的分组变量
+                     print.byvar = FALSE) # 不显示标签名字
+m.publ.sub
+```
+```{r}
+pdf("figure2.pdf", width = 10, height = 7.05)
+
+forest(m.publ.sub,
+       sortvar = year,
+       xlim = c(0.1, 100),                   # 设定x轴的范围
+       at = c(0.1, 0.3, 1, 3, 10, 30, 100))  # x轴上标注具体的刻度
+
+dev.off()
+
+```
+```{r}
+# 使用不同的缺失值处理方法 
+mmiss.0 <- metamiss(m.publ, drop.h, drop.p)  # 默认的方法为“miss.0”
+mmiss.1 <- metamiss(m.publ, drop.h, drop.p, method = "1")  
+mmiss.pc <- metamiss(m.publ, drop.h, drop.p, method = "pc")
+mmiss.pe <- metamiss(m.publ, drop.h, drop.p, method = "pe")
+mmiss.p <- metamiss(m.publ, drop.h, drop.p, method = "p")
+mmiss.b <- metamiss(m.publ, drop.h, drop.p, method = "b", small.values = "bad")
+mmiss.w <- metamiss(m.publ, drop.h, drop.p, method = "w", small.values = "bad")
+mmiss.gh <- metamiss(m.publ, drop.h, drop.p, method = "GH")
+mmiss.imor2 <- metamiss(m.publ, drop.h, drop.p, method = "IMOR", IMOR.e = 2)
+mmiss.imor0.5 <- metamiss(m.publ, drop.h, drop.p, method = "IMOR", IMOR.e = 0.5)
+
+# 给各个方法注明标签，用于下方森林图
+labels <- c("Available case analysis (ACA)",
+          "Impute no events (ICA-0)", "Impute events (ICA-1)",
+          "Observed risk in control group (ICA-pc)",
+          "Observed risk in experimental group (ICA-pe)",
+          "Observed group-specific risks (ICA-p)",
+          "Best-case scenario (ICA-b)", "Worst-case scenario (ICA-w)",
+          "Gamble-Hollis analysis",
+          "IMOR.e = 2, IMOR.c = 2", "IMOR.e = 0.5, IMOR.c = 0.5")
+
+# 使用inverse-variance method进行汇总
+m.publ.iv <- update(m.publ, method = "Inverse")
+
+# 将结果整合
+mbr = metabind(m.publ.iv,
+               mmiss.0, mmiss.1,
+               mmiss.pc, mmiss.pe, mmiss.p,
+               mmiss.b, mmiss.w, mmiss.gh,
+               mmiss.imor2, mmiss.imor0.5,
+               name = labels, pooled = "random")
+
+# 制作森林图
+pdf("figure3.pdf", width = 7, height = 8)
+
+forest(mbr, xlim = c(0.25, 4),
+       label.left = "Favours placebo",
+       label.right = "Favours haloperidol",
+       leftcols = "studlab",
+       leftlab = "Meta-Analysis Method",
+       type.study = "diamond",
+       hetlab = "",
+       print.Q = TRUE,
+       fs.study = 10)
+
+dev.off()
+```
+
+```{r}
+funnel(m.publ)
+```
+```{r}
+funnel(m.publ,
+       contour.levels = c(0.9, 0.95, 0.99),
+       col.contour = c ("darkgray", "gray", "lightgray"))
+```
+```{r}
+tf.publ <- trimfill(m.publ)
+summary(tf.publ)
+```
+```{r}
+funnel(tf.publ)
+```
+```{r}
+l1.publ = limitmeta(m.publ)
+summary(l1.publ)
+```
+```
+https://cran.r-project.org/view=MetaAnalysis
+```
+
